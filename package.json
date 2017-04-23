@@ -1,0 +1,22 @@
+{
+  "name": "urlshortener",
+  "version": "1.0.0",
+  "description": "url shortener app",
+  "main": "server.js",
+  "scripts": {
+    "test": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Njunge11/URL-Shortener-Microservice.git"
+  },
+  "author": "Njunge Njenga",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Njunge11/URL-Shortener-Microservice/issues"
+  },
+  "homepage": "https://github.com/Njunge11/URL-Shortener-Microservice#readme",
+  "dependencies": {
+    "express": "^4.15.2"
+  }
+}
