@@ -1,30 +1,49 @@
 /**
- * work in progress - got lot's of cleaning up, testing and debugging to do :-)
+ * work in progress - TO-DO: add redirect functionality and test
  */
-
 var express = require("express");
 var mongo = require("mongodb").MongoClient;
 var shortid = require("shortid");
 var app = express();
 var port = "8000";
-var url = "mongodb://localhost:27017/url_shortener";
+var mongoUrl = "mongodb://localhost:27017/url_shortener";
 var baseUrl = "http://localhost:" + port;
+var collection = "urlData";
 
-function insertIntoDatabase(shortUrl, urlToShorten) {
 
-    mongo.connect(url, function (err, db) {
+var queryDocument = function (db, urlToShorten, resultSet) {
+
+    db.collection(collection).find({ url: urlToShorten }).toArray(function (err, result) {
+        if (err) throw err;
+
+        return resultSet(result);
+
+    });
+}
+
+var insertDocument = function (db, shortUrl, urlToShorten, resultSet) {
+
+    db.collection(collection).insertOne({
+        "shortUrl": shortUrl,
+        "url": urlToShorten,
+        "createdAt": new Date()
+    },
+        function (err, result) {
+            if (err) throw err
+        db.close();
+            return resultSet(result);
+        })
+}
+
+var connectToDatabase = function (databaseConnection) {
+    mongo.connect(mongoUrl, function (err, db) {
 
         if (err) throw err;
-        var collection = db.collection("urlData");
-        collection.insert({ "shortUrl": shortUrl, "url": urlToShorten, "createdAt": new Date() }, function (err, data) {
 
-            if (err) return err;
-     //   {"original_url":"https://www.google.co","short_url":"https://little-url.herokuapp.com/5274"}
-            console.log(JSON.stringify({"original_url":data.ops[0].url, "short_url":data.ops[0].shortUrl}));
-        });
-    });
-
+        return databaseConnection(db);
+    })
 }
+
 function validateURL(urlToShorten) {
 
     var regexp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
@@ -38,19 +57,34 @@ app.get("/new/*", function (request, response) {
     var index = url.split("/", 2).join("/").length;
     var urlToShorten = url.substring(index + 1);
     var isURLValid = validateURL(urlToShorten);
-
+    console.log("the url to shorten:" + urlToShorten);
     if (isURLValid) {
 
-        //insert the data into the db
-        //  var insertData = insertIntoDatabase(urlToShorten);
         var shortUrl = baseUrl + "/" + shortid.generate();
-        var insertData = insertIntoDatabase(shortUrl, urlToShorten);
-        console.log(insertData);
-    
+        connectToDatabase(function (db) {
+            /**
+             * check if the url to shorten exists in the db, 
+             * if it does, fetch the shortened url and return response.
+             */
+            queryDocument(db, urlToShorten, function (result) {
 
-        
+                result.length !== 0 ? response.send(JSON.stringify({
+                    original_url: result[0].url,
+                    short_url: result[0].shortUrl
+                })) :
+                    /**
+                         * if the url does not exist, then insert it into the database, 
+                         * get result-set and return response.
+                         */
+                    insertDocument(db, shortUrl, urlToShorten, function (result) {
 
-
+                        response.send(JSON.stringify({
+                            original_url: result.ops[0].url,
+                            short_url: result.ops[0].shortUrl
+                        }));
+                    });
+                });
+             });
     } else {
 
         //return error response
@@ -59,10 +93,9 @@ app.get("/new/*", function (request, response) {
             + " make sure you have a valid protocol and real site."
         }));
     }
-
 });
 
-app.listen(8000, function () {
+app.listen(port, function () {
 
     console.log("server is listening on port:" + port);
 
