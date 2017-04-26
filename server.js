@@ -1,5 +1,7 @@
 /**
- * work in progress - TO-DO: add redirect functionality and test
+ *A JavaScript app that enables one to pass a URL as a parameter and receive 
+ *a shortened URL in the JSON response.
+ *freeCodeCamp - https://www.freecodecamp.com/challenges/url-shortener-microservice
  */
 var express = require("express");
 var mongo = require("mongodb").MongoClient;
@@ -10,17 +12,27 @@ var mongoUrl = "mongodb://localhost:27017/url_shortener";
 var baseUrl = "http://localhost:" + port;
 var collection = "urlData";
 
+/**
+ * query the database to check if the passed url exists
+ * @param {*} db 
+ * @param {*} urlToShorten 
+ * @param {*} resultSet 
+ */
+var queryDocument = function (db, query, resultSet) {
 
-var queryDocument = function (db, urlToShorten, resultSet) {
-
-    db.collection(collection).find({ url: urlToShorten }).toArray(function (err, result) {
+    db.collection(collection).find(query).toArray(function (err, result) {
         if (err) throw err;
-
         return resultSet(result);
 
     });
 }
-
+/**
+ * insert a document containing, the url to be shortened as well as the shortened url
+ * @param {*} db 
+ * @param {*} shortUrl 
+ * @param {*} urlToShorten 
+ * @param {*} resultSet 
+ */
 var insertDocument = function (db, shortUrl, urlToShorten, resultSet) {
 
     db.collection(collection).insertOne({
@@ -34,7 +46,10 @@ var insertDocument = function (db, shortUrl, urlToShorten, resultSet) {
             return resultSet(result);
         })
 }
-
+/**
+ * establish a connection to the database
+ * @param {*} databaseConnection 
+ */
 var connectToDatabase = function (databaseConnection) {
     mongo.connect(mongoUrl, function (err, db) {
 
@@ -43,7 +58,10 @@ var connectToDatabase = function (databaseConnection) {
         return databaseConnection(db);
     })
 }
-
+/**
+ * check if the url is valid
+ * @param {*} urlToShorten 
+ */
 function validateURL(urlToShorten) {
 
     var regexp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
@@ -57,7 +75,8 @@ app.get("/new/*", function (request, response) {
     var index = url.split("/", 2).join("/").length;
     var urlToShorten = url.substring(index + 1);
     var isURLValid = validateURL(urlToShorten);
-    console.log("the url to shorten:" + urlToShorten);
+    var query = { url: urlToShorten };
+
     if (isURLValid) {
 
         var shortUrl = baseUrl + "/" + shortid.generate();
@@ -66,7 +85,7 @@ app.get("/new/*", function (request, response) {
              * check if the url to shorten exists in the db, 
              * if it does, fetch the shortened url and return response.
              */
-            queryDocument(db, urlToShorten, function (result) {
+            queryDocument(db, query, function (result) {
 
                 if (result.length !== 0) {
                     db.close();
@@ -88,9 +107,7 @@ app.get("/new/*", function (request, response) {
                             short_url: result.ops[0].shortUrl
                         }));
                     });
-
                 }
-
             });
         });
     } else {
@@ -101,6 +118,22 @@ app.get("/new/*", function (request, response) {
             + " make sure you have a valid protocol and real site."
         }));
     }
+});
+
+app.get("/:shortened_url", function (request, response) {
+
+    var hash = request.params.shortened_url;
+    var url = "http://localhost:" + port + "/" + hash;
+    var query = { shortUrl: url };
+    connectToDatabase(function (db) {
+
+        queryDocument(db, query, function (result) {
+            result.length === 1
+                ? response.redirect(result[0].url)
+                : response.send(JSON.stringify({ error: "This url is not in the database." }));
+        })
+        db.close();
+    });
 });
 
 app.listen(port, function () {
