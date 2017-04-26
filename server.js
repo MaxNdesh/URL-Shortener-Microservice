@@ -30,7 +30,7 @@ var insertDocument = function (db, shortUrl, urlToShorten, resultSet) {
     },
         function (err, result) {
             if (err) throw err
-        db.close();
+
             return resultSet(result);
         })
 }
@@ -68,23 +68,31 @@ app.get("/new/*", function (request, response) {
              */
             queryDocument(db, urlToShorten, function (result) {
 
-                result.length !== 0 ? response.send(JSON.stringify({
-                    original_url: result[0].url,
-                    short_url: result[0].shortUrl
-                })) :
+                if (result.length !== 0) {
+                    db.close();
+                    response.send(JSON.stringify({
+                        original_url: result[0].url,
+                        short_url: result[0].shortUrl
+                    }));
+
+                } else {
                     /**
-                         * if the url does not exist, then insert it into the database, 
-                         * get result-set and return response.
-                         */
+                       * if the url does not exist, then insert it into the database, 
+                       * get result-set and return response.
+                       */
                     insertDocument(db, shortUrl, urlToShorten, function (result) {
 
+                        db.close();
                         response.send(JSON.stringify({
                             original_url: result.ops[0].url,
                             short_url: result.ops[0].shortUrl
                         }));
                     });
-                });
-             });
+
+                }
+
+            });
+        });
     } else {
 
         //return error response
